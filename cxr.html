@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>情绪盒子</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- 配置Tailwind -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // 主色改为淡绿色系，整体更清新温暖
+            primary: '#7DD3A6', // 浅薄荷绿（主色）
+            happy: '#BDF7D1',   // 快乐：更柔和的薄荷粉绿
+            sad: '#A7D8F5',     // 悲伤：柔和天蓝
+            angry: '#F7C6C6',   // 愤怒：淡粉红
+            calm: '#5EEAD4',    // 平静：清爽青绿色
+            surprised: '#FFF7C2', // 惊讶：柔和浅黄
+            scared: '#D7EAFB',  // 害怕：很淡的蓝紫
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .box-shadow-3d {
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2), 
+                    inset 0 0 20px rgba(255, 255, 255, 0.1);
+      }
+      .box-inset-shadow {
+        box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2);
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .perspective {
+        perspective: 1000px;
+      }
+      .preserve-3d {
+        transform-style: preserve-3d;
+      }
+      .backface-hidden {
+        backface-visibility: hidden;
+      }
+      .rotate-y-180 {
+        transform: rotateY(180deg);
+      }
+      /* 盒盖动画 */
+      .box-lid {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 12px;
+        height: 64px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(0,0,0,0.06));
+        border-radius: 10px;
+        transform-origin: top center;
+        transition: transform 520ms cubic-bezier(.2,.9,.2,1), box-shadow 300ms;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+        z-index: 40;
+        transform-style: preserve-3d;
+        pointer-events: auto;
+      }
+      .lid-open {
+        transform: rotateX(-78deg) translateY(-18px);
+        box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+      }
+      .inside-fade {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+        transition: opacity 360ms ease, transform 360ms ease;
+      }
+      .inside-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      /* 3D 侧面（制造立体盒子感） */
+      :root { --box-depth: 28px; }
+      .box-side {
+        position: absolute;
+        width: var(--box-depth);
+        height: calc(100% - 24px);
+        top: 12px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.16));
+        border-radius: 6px;
+        transform-origin: center;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      }
+      .box-side.left {
+        left: -1px;
+        transform: translateX(-50%) rotateY(18deg) translateZ(calc(-1 * var(--box-depth) / 2));
+        border-top-right-radius: 6px;
+        border-bottom-right-radius: 6px;
+      }
+      .box-side.right {
+        right: -1px;
+        transform: translateX(50%) rotateY(-18deg) translateZ(calc(-1 * var(--box-depth) / 2));
+        border-top-left-radius: 6px;
+        border-bottom-left-radius: 6px;
+      }
+      .box-side.bottom {
+        left: 12px;
+        right: 12px;
+        height: var(--box-depth);
+        top: auto;
+        bottom: 12px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.22));
+        transform: translateZ(calc(-1 * var(--box-depth) / 2)) rotateX(6deg);
+        border-radius: 6px;
+      }
+      /* 六面立方体基础样式 */
+      .cube-scene { width: var(--size); height: var(--size); margin: 0 auto; position: relative; }
+      .cube {
+        width: var(--size);
+        height: var(--size);
+        position: relative;
+        transform-style: preserve-3d;
+        transform: translateZ(calc(var(--size) / -2)) rotateY(0deg);
+        transition: transform 520ms cubic-bezier(.2,.9,.2,1);
+      }
+      .cube.opened { transform: translateZ(calc(var(--size) / -2)) rotateY(180deg); }
+      .face {
+        position: absolute;
+        width: var(--size);
+        height: var(--size);
+        left: 0;
+        top: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        overflow: hidden;
+        backface-visibility: hidden;
+      }
+      .face.front  { transform: rotateY(0deg)    translateZ(calc(var(--size)/2)); }
+      .face.back   { transform: rotateY(180deg)  translateZ(calc(var(--size)/2)); }
+      .face.right  { transform: rotateY(90deg)   translateZ(calc(var(--size)/2)); }
+      .face.left   { transform: rotateY(-90deg)  translateZ(calc(var(--size)/2)); }
+      .face.top    { transform: rotateX(90deg)   translateZ(calc(var(--size)/2)); transform-origin: center top; }
+      .face.bottom { transform: rotateX(-90deg)  translateZ(calc(var(--size)/2)); }
+      /* 单独 lid（顶盖）用于开合动画：绕后缘转动 */
+      .lid {
+        position: absolute;
+        width: calc(var(--size) - 24px);
+        height: calc(var(--size) / 3.6);
+        left: 12px;
+        top: 12px;
+        transform-origin: center top;
+        border-radius: 10px;
+        transition: transform 520ms cubic-bezier(.2,.9,.2,1), box-shadow 300ms;
+        z-index: 60;
+        /* 用主色的浅阴影 */
+        box-shadow: 0 8px 18px rgba(125,211,166,0.12);
+        background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.04));
+      }
+      .lid.closed { transform: translateZ(calc(var(--size)/2)); }
+      .lid.opened { transform: rotateX(-110deg) translateZ(calc(var(--size)/2)); box-shadow: 0 20px 40px rgba(0,0,0,0.28); }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-green-50 to-green-100 min-h-screen font-inter flex items-center justify-center p-4 text-gray-800">
+  <div class="max-w-3xl w-full mx-auto">
+    <!-- 标题区域 -->
+    <div class="text-center mb-8">
+      <h1 class="text-[clamp(2rem,5vw,3rem)] font-bold text-primary mb-2 text-shadow">情绪盒子</h1>
+      <p class="text-gray-600 text-lg">选择一种情绪，打开盒子看看吧</p>
+    </div>
+    
+    <!-- 情绪选择区域（使用 Emoji） -->
+    <div class="flex flex-wrap justify-center gap-4 mb-6">
+      <button class="emotion-btn bg-primary hover:bg-primary/90 text-white p-3 rounded-full transition-all duration-300 shadow-md hover:scale-110 flex items-center ring-0" data-emotion="happy"> 
+        <span class="text-2xl">😊</span>
+        <span class="ml-2">快乐</span>
+      </button>
+      <button class="emotion-btn bg-primary hover:bg-primary/90 text-white p-3 rounded-full transition-all duration-300 shadow-md hover:scale-110 flex items-center ring-0" data-emotion="sad">
+        <span class="text-2xl">😟</span>
+        <span class="ml-2">悲伤</span>
+      </button>
+      <button class="emotion-btn bg-primary hover:bg-primary/90 text-white p-3 rounded-full transition-all duration-300 shadow-md hover:scale-110 flex items-center ring-0" data-emotion="angry">
+        <span class="text-2xl">🤯</span>
+        <span class="ml-2">震惊/愤怒</span>
+      </button>
+      <button class="emotion-btn bg-primary hover:bg-primary/90 text-white p-3 rounded-full transition-all duration-300 shadow-md hover:scale-110 flex items-center ring-0" data-emotion="calm">
+        <span class="text-2xl">😌</span>
+        <span class="ml-2">平静</span>
+      </button>
+      <button class="emotion-btn bg-primary hover:bg-primary/90 text-white p-3 rounded-full transition-all duration-300 shadow-md hover:scale-110 flex items-center ring-0" data-emotion="surprised">
+        <span class="text-2xl">😲</span>
+        <span class="ml-2">惊喜</span>
+      </button>
+      <button class="emotion-btn bg-primary hover:bg-primary/90 text-white p-3 rounded-full transition-all duration-300 shadow-md hover:scale-110 flex items-center ring-0" data-emotion="scared">
+        <span class="text-2xl">😨</span>
+        <span class="ml-2">害怕</span>
+      </button>
+    </div>
+
+    <!-- 盒子容器（加入盒盖元素和更平滑的开盒流程） -->
+    <div class="perspective mx-auto cube-scene" style="--size:260px; --box-depth:28px;">
+      <div id="cube" class="cube">
+        <!-- 六面：front/back/left/right/top(bottom为内底) -->
+        <div class="face front bg-primary cursor-pointer shadow-lg" id="face-front">
+          <div class="text-white text-6xl">📦</div>
+        </div>
+        <div class="face back bg-white box-inset-shadow" id="face-back">
+          <div style="text-align:center; padding:16px;">
+            <div id="emotion-icon" style="font-size:56px; margin-bottom:8px;">😊</div>
+            <div id="emotion-text" class="text-gray-700"><p class="text-lg">请先选择一种情绪，然后打开盒子</p></div>
+            <button id="close-btn" class="mt-4 bg-primary text-white px-4 py-2 rounded-full hover:bg-primary/80 transition-all shadow-sm">关上盒子</button>
+          </div>
+        </div>
+        <div class="face right bg-gradient-to-br from-gray-200 to-gray-300" id="face-right"></div>
+        <div class="face left bg-gradient-to-br from-gray-200 to-gray-300" id="face-left"></div>
+        <div class="face bottom bg-gradient-to-br from-gray-200 to-gray-300" id="face-bottom"></div>
+        <!-- 顶盖（lid）单独作为可旋转元素，覆盖 top 面位置 -->
+  <div id="lid" class="lid bg-primary flex items-center justify-center text-white text-3xl closed">📦</div>
+      </div>
+    </div>
+
+    <!-- 使用说明 -->
+    <div class="mt-6 bg-white/60 p-4 rounded-lg shadow-sm text-gray-600 max-w-2xl mx-auto text-sm">
+      <h3 class="font-medium mb-2">如何使用情绪盒子</h3>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>先从上方选择你当前的心情（点表情按钮）。</li>
+        <li>点击盒盖或盒子正面，会看到“打开”的动画并显示一句鼓励或提示。</li>
+        <li>每次打开会从该情绪的短句池中取出一句，直到用尽再打乱循环，保证不重复感。</li>
+        <li>点击“关上盒子”可以把盒子合上，随时可以再次打开探索不同感受。</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // 情绪数据（使用 Emoji、指定颜色、每个情绪包含多条独特的短句）
+    const emotions = {
+      happy: {
+        emoji: '😊',
+        color: '#FBBF24',
+        messages: [
+          '阳光正好，适合微笑。',
+          '今天的你很有感染力，继续发光吧。',
+          '笑一个，璐璐笑起来最可爱了😗',
+          '好心情要来和我分享！快v我！'
+        ]
+      },
+      sad: {
+        emoji: '😟',
+        color: '#3B82F6',
+        messages: [
+          '抱抱宝宝，不开心要和我说哟',
+          '没有什么能够偶阻挡煮啵的步伐~',
+          '璐璐学霸加油加油再加油',
+          '想不想吃点好吃的来开心开心哇！'
+        ]
+      },
+      angry: {
+        emoji: '🤯',
+        color: '#EF4444',
+        messages: [
+          '先深呼吸，呼呼呼~。',
+          '给俺梆梆两拳泄泄愤hhh',
+          'calm down~又哪个小坏蛋惹我大宝贝。',
+          '快快快，把情绪放盒子里，开心每一天！'
+        ]
+      },
+      calm: {
+        emoji: '😌',
+        color: '#10B981',
+        messages: [
+          '让我在你心里激起涟漪~',
+          '宁静致远~芜湖',
+          '心如止水！渐入佳境！',
+          '平静就是最好的力量！'
+        ]
+      },
+      surprised: {
+        emoji: '😲',
+        color: '#F59E0B',
+        messages: [
+          '什么惊喜说来听听嘿嘿',
+          '怎么今天充满激动？',
+          '是不是考的非常好哇！',
+          '🤓什么好事哇'
+        ]
+      },
+      scared: {
+        emoji: '😨',
+        color: '#6366F1',
+        messages: [
+          '勇敢璐璐，不怕困难！',
+          '和俺说~~俺陪着你~',
+          '一步一步来哇煮啵别着急',
+          '加油加油💪💪💪，璐璐学霸很棒啦'
+        ]
+      }
+    };
+
+  // 确保至少 15 条不同语句（现在总共 24 条）
+
+    // 状态变量
+    let selectedEmotion = null;
+    let isOpen = false;
+
+  // DOM 元素
+  const cube = document.getElementById('cube');
+  const faceFront = document.getElementById('face-front');
+  const faceBack = document.getElementById('face-back');
+  const lid = document.getElementById('lid');
+    const emotionIcon = document.getElementById('emotion-icon');
+    const emotionText = document.getElementById('emotion-text').querySelector('p');
+    const closeBtn = document.getElementById('close-btn');
+    const emotionBtns = document.querySelectorAll('.emotion-btn');
+
+    // 为每个情绪创建一个随机轮换池，保证不重复直到耗尽
+    const messagePools = {};
+    function shuffle(arr){
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function getNextMessage(em){
+      if (!messagePools[em] || messagePools[em].length === 0) {
+        // 复制并打乱
+        messagePools[em] = shuffle(emotions[em].messages.slice());
+      }
+      return messagePools[em].shift();
+    }
+
+    // peek 不消耗，用于选择时预览
+    function peekNextMessage(em){
+      if (!messagePools[em] || messagePools[em].length === 0) {
+        messagePools[em] = shuffle(emotions[em].messages.slice());
+      }
+      return messagePools[em][0];
+    }
+
+    // 选择情绪（不消耗消息，仅预览）
+    emotionBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        console.log('[emotion-btn] clicked', btn.dataset.emotion);
+        // 样式处理
+        emotionBtns.forEach(b => b.classList.remove('ring-4', 'ring-offset-2'));
+        btn.classList.add('ring-4', 'ring-offset-2', 'ring-white/30');
+
+        selectedEmotion = btn.dataset.emotion;
+
+        // 预更新内部显示（预览，但不移除消息）
+        const em = emotions[selectedEmotion];
+        emotionIcon.textContent = em.emoji;
+        emotionIcon.style.color = em.color;
+        const preview = peekNextMessage(selectedEmotion);
+        emotionText.textContent = preview;
+      });
+    });
+
+    // 打开盒子的顺序动画：先掀盖，再翻转显示内部，再显示文字
+    function openBox(){
+      console.log('[openBox] called, isOpen=', isOpen, 'selectedEmotion=', selectedEmotion);
+      if (isOpen) return;
+      isOpen = true;
+      if (lid) {
+        lid.classList.remove('closed');
+        lid.classList.add('opened');
+        lid.style.pointerEvents = 'auto';
+        lid.style.zIndex = 60;
+      }
+      // 让立方体翻转以显示背面
+      if (cube) cube.classList.add('opened');
+      // 稍作延迟再让内部显示最新消息
+      setTimeout(() => {
+        // 确保已选择情绪
+        if (!selectedEmotion) {
+          const randomBtn = emotionBtns[Math.floor(Math.random() * emotionBtns.length)];
+          randomBtn.click();
+        }
+        const msg = getNextMessage(selectedEmotion);
+        emotionIcon.textContent = emotions[selectedEmotion].emoji;
+        emotionIcon.style.color = emotions[selectedEmotion].color;
+        // 文本淡入
+        emotionText.style.opacity = 0;
+        emotionText.textContent = msg;
+        requestAnimationFrame(()=>{
+          emotionText.style.transition = 'opacity 360ms ease';
+          emotionText.style.opacity = 1;
+        });
+      }, 240);
+    }
+
+    function closeBox(){
+      if (!isOpen) return;
+      // 关盖并恢复状态
+      lid.classList.remove('opened');
+      lid.classList.add('closed');
+      // 让立方体翻回
+      if (cube) cube.classList.remove('opened');
+      isOpen = false;
+    }
+
+    // 绑定点击事件（并记录绑定结果）
+    console.log('[bindings] faceFront, lid, closeBtn:', !!faceFront, !!lid, !!closeBtn);
+    if (faceFront) faceFront.addEventListener('click', (e) => { console.log('[faceFront] click'); openBox(); });
+    if (lid) lid.addEventListener('click', (e) => {
+      console.log('[lid] click - toggling', isOpen);
+      // 切换开关
+      if (isOpen) closeBox(); else openBox();
+      e.stopPropagation();
+    });
+    if (closeBtn) closeBtn.addEventListener('click', (e) => { console.log('[closeBtn] click'); e.stopPropagation(); closeBox(); });
+
+    // 点击盒内任意区域也可快速切换为下一条句子（互动性）
+    faceBack.addEventListener('click', (e) => {
+      if (e.target === closeBtn) return;
+      if (!selectedEmotion) return;
+      const msg = getNextMessage(selectedEmotion);
+      emotionText.style.opacity = 0;
+      setTimeout(()=>{
+        emotionText.textContent = msg;
+        emotionText.style.opacity = 1;
+      }, 180);
+    });
+
+    // 页面加载后随机选中一个情绪（仅选中不打开）
+    setTimeout(() => {
+      const randomBtn = emotionBtns[Math.floor(Math.random() * emotionBtns.length)];
+      randomBtn.click();
+    }, 400);
+
+    // 开发时辅助：记录页面点击位置与是否落在 cube 区域（便于调试被遮挡问题）
+    document.addEventListener('click', (e) => {
+      try {
+        const rect = cube.getBoundingClientRect();
+        const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+        console.log('[doc.click] at', e.clientX, e.clientY, 'insideCube=', inside);
+      } catch (err) {
+        // ignore
+      }
+    }, true);
+  </script>
+</body>
+</html>
